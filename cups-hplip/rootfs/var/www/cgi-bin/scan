@@ -1,72 +1,77 @@
 #!/bin/sh
-# Scan CGI. op=info dumps the backend's capabilities so failures can be
-# diagnosed without rebuilding the add-on.
+# Scan CGI.
+#  - one scan at a time (a second request must never pile onto the device:
+#    concurrent access leaves a stale usbfs claim that wedges the scanner)
+#  - wake the scanner before the real scan; this hardware sleeps and the
+#    first open after an idle period blocks
+#  - every scanimage call is bounded, and SIGKILL is a last resort because
+#    killing mid-transfer is what strands the usbfs claim
 q="$QUERY_STRING"
 val() { echo "$q" | tr '&' '\n' | grep "^$1=" | head -1 | cut -d= -f2- | sed 's/%20/ /g'; }
-
 op=$(val op)
 
 if [ "$op" = "info" ]; then
     echo "Content-Type: text/plain"; echo
-    echo "### scanimage -L"; timeout 20 scanimage -L 2>&1 || echo "(timed out - device busy or wedged)"
-    echo; echo "### scanimage -A (device options)"; timeout 25 scanimage -A 2>&1 || echo "(timed out - device busy or wedged)"
+    echo "### scanimage -L"; timeout 25 scanimage -L 2>&1 || echo "(timed out)"
+    echo; echo "### scanimage -A"; timeout 30 scanimage -A 2>&1 || echo "(timed out - device busy or asleep)"
+    echo; echo "### lock"; ls -l /tmp/scan.lock 2>/dev/null || echo "  (none - idle)"
     echo; echo "### plugins"; ls -l /usr/share/hplip/scan/plugins/ 2>&1
     echo; echo "### hplip.state"; cat /var/lib/hp/hplip.state 2>&1
-    echo; echo "### hplip.conf [hplip]"; grep -A2 '^\[hplip\]' /etc/hp/hplip.conf 2>&1
-    echo; echo "### dll.conf"; grep -v '^#' /etc/sane.d/dll.conf 2>/dev/null | grep -v '^$'
     exit 0
 fi
+
+LOCK=/tmp/scan.lock
+if ! mkdir "$LOCK" 2>/dev/null; then
+    age=$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))
+    if [ "$age" -lt 900 ]; then
+        echo "Status: 409"; echo "Content-Type: text/plain"; echo
+        echo "A scan is already running (started ${age}s ago). Wait for it to finish."
+        exit 0
+    fi
+    rmdir "$LOCK" 2>/dev/null; mkdir "$LOCK" 2>/dev/null   # stale lock
+fi
+trap 'rmdir "$LOCK" 2>/dev/null; rm -f "$tmp" "$err" "$tmp.pdf" 2>/dev/null' EXIT HUP INT TERM
 
 dpi=$(val dpi);    case "$dpi"  in 75|100|150|200|300|600|1200) ;; *) dpi=300 ;; esac
 mode=$(val mode);  case "$mode" in Gray|Color|Lineart) ;; *) mode=Gray ;; esac
 fmt=$(val format); case "$fmt"  in jpeg|png|tiff|pdf) ;; *) fmt=jpeg ;; esac
-# PDF is not a scanimage output format: scan to TIFF, then tiff2pdf.
 if [ "$fmt" = "pdf" ]; then sfmt=tiff; else sfmt="$fmt"; fi
-# hpaio advertises a 381 mm scan height for this hardware but the glass is
-# only A4. scanimage then asks for more scanlines than the scanner can
-# deliver and SANE aborts with "Application transferred too few scanlines".
-# Constrain the scan area explicitly.
 size=$(val size)
 case "$size" in
     letter) geom="-x 215.9 -y 279.4" ;;
     full)   geom="" ;;
-    *)      geom="-x 215.9 -y 297" ;;   # A4, the default
+    *)      geom="-x 215.9 -y 297" ;;   # A4 - hpaio wrongly advertises 381 mm
 esac
-# Whitelisted: this value is word-split into scanimage's argv, so an
-# unvalidated one lets any LAN client inject arbitrary scanimage options
-# (--output-file would write anywhere the add-on can reach).
 src=$(val source); case "$src" in Flatbed|ADF) ;; *) src="" ;; esac
-extra="$geom"
-[ -n "$src" ] && extra="$extra --source $src"
+extra="$geom"; [ -n "$src" ] && extra="$extra --source $src"
+case "$dpi" in 1200) T=600 ;; 600) T=300 ;; 300) T=200 ;; *) T=150 ;; esac
 
-case "$dpi" in 1200) SCAN_TIMEOUT=600 ;; 600) SCAN_TIMEOUT=300 ;; 300) SCAN_TIMEOUT=180 ;; *) SCAN_TIMEOUT=120 ;; esac
+tmp=$(mktemp /tmp/scan.XXXXXX); err="$tmp.err"
 
-tmp=$(mktemp /tmp/scan.XXXXXX)
-err="$tmp.err"
-# fires on normal exit and on SIGTERM when the browser disconnects mid-scan
-trap 'rm -f "$tmp" "$err" "$tmp.pdf"' EXIT HUP INT TERM
-# The scanner rejects a second client while busy, and the first attempt after
-# a long idle can come back short. One retry costs nothing.
-n=0
-while [ $n -lt 2 ]; do
-    # SIGTERM at $SCAN_TIMEOUT, SIGKILL 10s later: a wedged scanimage must
-    # never keep hold of the scanner after the request is over.
-    if timeout -k 10 "$SCAN_TIMEOUT" \
-         scanimage --format="$sfmt" --resolution "$dpi" --mode "$mode" $extra \
-         > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
+# Wake: this printer detaches from USB when idle and the first open blocks.
+# A cheap enumerate costs ~1 s awake and gives the device time to come back.
+timeout 30 scanimage -L >/dev/null 2>&1
+
+n=1
+while [ $n -le 3 ]; do
+    if timeout -k 15 "$T" scanimage --format="$sfmt" --resolution "$dpi" \
+         --mode "$mode" $extra > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
         if [ "$fmt" = "pdf" ]; then
             if tiff2pdf -o "$tmp.pdf" "$tmp" 2>>"$err" && [ -s "$tmp.pdf" ]; then
                 echo "Content-Type: application/pdf"; echo "Cache-Control: no-store"; echo
-                cat "$tmp.pdf"; rm -f "$tmp.pdf"; exit 0
+                cat "$tmp.pdf"; exit 0
             fi
-            rm -f "$tmp.pdf"
         else
             echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
             cat "$tmp"; exit 0
         fi
     fi
-    n=$((n+1)); sleep 3
+    # backoff must exceed the ~11 s USB re-enumeration, not the old 3 s
+    n=$((n+1)); [ $n -le 3 ] && sleep 14
 done
 echo "Status: 500"; echo "Content-Type: text/plain"; echo
-echo "scan failed (dpi=$dpi mode=$mode fmt=$fmt src=${src:-default}):"
-cat "$err" 2>/dev/null
+echo "scan failed after 3 attempts (dpi=$dpi mode=$mode fmt=$fmt size=${size:-a4}):"
+if [ -s "$err" ]; then cat "$err"; else
+  echo "(no error output - scanimage was killed by the ${T}s timeout,"
+  echo " which usually means the scanner never woke or is held by another client)"
+fi

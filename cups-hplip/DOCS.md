@@ -169,6 +169,28 @@ Every release also re-runs `apt-get upgrade` in a small final layer, so updating
 the add-on pulls current Debian security patches for CUPS, ghostscript and
 hpcups. Without that the cached apt layer would freeze those packages forever.
 
+## Editing the scan UI without rebuilding
+
+Since v1.4.0 `/var/www` is a symlink to **`/share/cups/www`**, seeded from the
+image on first start. The CGI is executed per request, so editing
+`/share/cups/www/cgi-bin/scan` or `index.html` takes effect on the next scan -
+no rebuild, no add-on restart. Delete a file and it is re-seeded from the image
+at the next start.
+
+## The scanner sleeps, and that matters
+
+This hardware detaches from USB when idle and takes ~11 s to re-enumerate. The
+CGI therefore wakes it with a cheap `scanimage -L` before the real scan, and
+retries with a 14 s backoff (the old 3 s was shorter than the wake itself).
+
+Only **one scan at a time**: a lock directory makes a second request return
+HTTP 409 immediately. This is not politeness - concurrent access, or killing a
+scan mid-transfer, strands a `usbfs` claim on the scanner interface that wedges
+the device for every later client. If that happens, restart the add-on; you can
+confirm it with:
+
+    ls -l /sys/bus/usb/devices/1-1.3:1.2/driver     # usbfs = claimed
+
 ## Versioning policy — read before bumping the base image
 
 The base is pinned to `ghcr.io/hassio-addons/debian-base:7.6.2` (Debian 12

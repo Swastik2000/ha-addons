@@ -8,8 +8,20 @@ if [ "$(jq -r '.enable_scanning // false' /data/options.json 2>/dev/null)" != "t
     exit 0
 fi
 
-# hpaio must be listed for SANE to load it
-rm -f /tmp/scan.* 2>/dev/null || true
+rm -f /tmp/scan.* /tmp/scan.lock 2>/dev/null || true
+
+# --- serve the UI from /share so it can be edited without rebuilding -------
+# Same trick as /etc/cups. The CGI is re-executed per request, so an edit on
+# /share is live immediately. The image copy is the seed and the fallback.
+WWW=/share/cups/www
+if [ ! -f "$WWW/cgi-bin/scan" ]; then
+    mkdir -p "$WWW"
+    cp -r /var/www/. "$WWW"/ 2>/dev/null || true
+    bashio::log.info "scanning: seeded editable UI at $WWW"
+fi
+chmod -R 755 "$WWW" 2>/dev/null || true
+rm -rf /var/www && ln -sfn "$WWW" /var/www
+bashio::log.info "scanning: UI served from $WWW (edit there, no rebuild needed)"
 
 grep -qx 'hpaio' /etc/sane.d/dll.conf 2>/dev/null || echo 'hpaio' >> /etc/sane.d/dll.conf
 
@@ -20,6 +32,5 @@ else
 fi
 
 bashio::log.info "scanning: probing for the scanner..."
-scanimage -L 2>&1 | sed 's/^/[scan] /' || true
-
-bashio::log.info "scanning: UI will be available on http://<ha-ip>:8090"
+timeout 25 scanimage -L 2>&1 | sed 's/^/[scan] /' || true
+bashio::log.info "scanning: UI available on http://<ha-ip>:8090"

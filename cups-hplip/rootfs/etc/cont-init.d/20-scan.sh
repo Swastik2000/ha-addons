@@ -9,6 +9,8 @@ if [ "$(jq -r '.enable_scanning // false' /data/options.json 2>/dev/null)" != "t
 fi
 
 # hpaio must be listed for SANE to load it
+rm -f /tmp/scan.* 2>/dev/null || true
+
 grep -qx 'hpaio' /etc/sane.d/dll.conf 2>/dev/null || echo 'hpaio' >> /etc/sane.d/dll.conf
 
 if [ -e /usr/share/hplip/scan/plugins/bb_marvell.so ]; then

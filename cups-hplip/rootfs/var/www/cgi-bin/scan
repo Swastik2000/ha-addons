@@ -8,8 +8,8 @@ op=$(val op)
 
 if [ "$op" = "info" ]; then
     echo "Content-Type: text/plain"; echo
-    echo "### scanimage -L"; scanimage -L 2>&1
-    echo; echo "### scanimage -A (device options)"; scanimage -A 2>&1
+    echo "### scanimage -L"; timeout 20 scanimage -L 2>&1 || echo "(timed out - device busy or wedged)"
+    echo; echo "### scanimage -A (device options)"; timeout 25 scanimage -A 2>&1 || echo "(timed out - device busy or wedged)"
     echo; echo "### plugins"; ls -l /usr/share/hplip/scan/plugins/ 2>&1
     echo; echo "### hplip.state"; cat /var/lib/hp/hplip.state 2>&1
     echo; echo "### hplip.conf [hplip]"; grep -A2 '^\[hplip\]' /etc/hp/hplip.conf 2>&1
@@ -37,6 +37,8 @@ src=$(val source); case "$src" in Flatbed|ADF) ;; *) src="" ;; esac
 extra="$geom"
 [ -n "$src" ] && extra="$extra --source $src"
 
+case "$dpi" in 600) SCAN_TIMEOUT=300 ;; 300) SCAN_TIMEOUT=180 ;; *) SCAN_TIMEOUT=120 ;; esac
+
 tmp=$(mktemp /tmp/scan.XXXXXX)
 err="$tmp.err"
 # fires on normal exit and on SIGTERM when the browser disconnects mid-scan
@@ -45,7 +47,10 @@ trap 'rm -f "$tmp" "$err"' EXIT HUP INT TERM
 # a long idle can come back short. One retry costs nothing.
 n=0
 while [ $n -lt 2 ]; do
-    if scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" $extra \
+    # SIGTERM at $SCAN_TIMEOUT, SIGKILL 10s later: a wedged scanimage must
+    # never keep hold of the scanner after the request is over.
+    if timeout -k 10 "$SCAN_TIMEOUT" \
+         scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" $extra \
          > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
         echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
         cat "$tmp"; exit 0

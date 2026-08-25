@@ -236,6 +236,15 @@ The queue must be **shared** and must have a **PPD** (a raw queue gets no `URF`
 record, so iOS lists it but cannot print). If avahi is advertising on many
 docker interfaces, set `mdns_interface`.
 
+**A scan hangs and every later scan fails too**
+
+Fixed in v1.2.5. `scanimage` had no timeout, and busybox does not reliably kill
+a CGI when the browser disconnects, so one hung scan kept hold of the USB
+scanner and wedged every request after it - `?op=info` would hang as well,
+which is the tell. Scans are now bounded (120 s, 180 s at 300 dpi, 300 s at
+600 dpi, SIGKILL 10 s later) and stale temp files are swept at startup.
+Restarting the add-on clears a wedge on older versions.
+
 **Printer sleeps and jobs seem stuck**
 Normal. These printers drop off the USB bus when idle and re-enumerate in ~10 s.
 The queue's error policy is `retry-job`, so jobs wait and print on wake. CUPS

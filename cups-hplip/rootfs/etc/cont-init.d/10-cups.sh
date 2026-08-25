@@ -21,7 +21,6 @@ DefaultShared Yes
 ReadyPaperSizes A4,Letter
 WebInterface Yes
 DefaultAuthType None
-JobSheets none,none
 PreserveJobHistory No
 
 <Location />

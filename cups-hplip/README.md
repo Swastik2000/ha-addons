@@ -91,3 +91,28 @@ version disagrees with `/etc/hp/hplip.conf` — check
 `/share/cups/hplip-plugin/` and the add-on log.
 
 The only link not verified here is USB transport to the physical printer.
+
+## If an iPhone prints the same document over and over
+
+Symptom: one tap on Print produces job after job, each a few seconds apart,
+with distinct job IDs in `page_log` — CUPS is not retrying, the phone is
+resubmitting.
+
+Cause: avahi advertising the queue on every interface in the container,
+including the `hassio` bridge and each docker `veth`. AirPrint clients try
+those `172.30.x.x` addresses, fail, and resubmit the whole job.
+
+Since v1.0.3 the add-on binds avahi to the interface holding the default
+route automatically. Override with the `mdns_interface` option (`end0` for
+wired, `wlan0` for Wi-Fi) if auto-detection picks the wrong one. Verify with:
+
+    ha addons logs <slug> | grep "avahi: interfaces"
+    # want exactly one "Joining mDNS multicast group on interface ..."
+
+To stop a runaway immediately:
+
+    cancel -a -h <ha-ip>:631 <queue>
+    cupsdisable -h <ha-ip>:631 <queue>
+
+Then clear the phone's own queue in **Print Center** (App Switcher) before
+re-enabling, or it will simply flood again.

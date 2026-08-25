@@ -164,6 +164,37 @@ Every release also re-runs `apt-get upgrade` in a small final layer, so updating
 the add-on pulls current Debian security patches for CUPS, ghostscript and
 hpcups. Without that the cached apt layer would freeze those packages forever.
 
+## Versioning policy — read before bumping the base image
+
+The base is pinned to `ghcr.io/hassio-addons/debian-base:7.6.2` (Debian 12
+bookworm, CUPS 2.4.2). That is a deliberate choice, not neglect.
+
+**Do not "upgrade" to CUPS 3.x.** It removes PPD and driver support entirely
+(`cupsd -t` already warns: *"Printer drivers are deprecated and will stop
+working in a future version of CUPS"*,
+[OpenPrinting/cups#103](https://github.com/OpenPrinting/cups/issues/103)).
+Host-based printers such as the M1136 **require** a PPD and the `hpcups`
+driver — they have no other way to be driven — so CUPS 3 would break this
+add-on rather than improve it. The migration path for that era is a Printer
+Application (`hplip-printer-app`) presenting the device as IPP Everywhere, which
+would be a rewrite, not a version bump.
+
+Version landscape at time of writing:
+
+| Source | CUPS |
+|---|---|
+| Debian 12 bookworm (**current base**) | 2.4.2 + security backports |
+| Debian 13 | 2.4.10 |
+| Debian sid | 2.4.18 |
+| Upstream latest | 2.4.19 |
+
+Debian never ships upstream's newest, and CVE fixes are backported into the
+pinned version (`+deb12uN`), which the security layer picks up on every release.
+
+Moving to a Debian 13 base is a reasonable **separate** change — hplip is also
+3.22.10 there, so the binary plug-in still matches — but it should be made on
+its own, not bundled with other work.
+
 ## Troubleshooting
 
 **The printer prints the same document over and over (iPhone)**

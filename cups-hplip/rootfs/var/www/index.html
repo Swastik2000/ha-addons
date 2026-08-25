@@ -16,13 +16,13 @@
 <form id="f" action="/cgi-bin/scan" method="get" target="out">
  <fieldset>
   <label>Resolution
-   <select name="dpi"><option>150</option><option selected>300</option><option>600</option></select></label>
+   <select name="dpi"><option>75</option><option>150</option><option selected>300</option><option>600</option><option>1200</option></select></label>
   <label>Mode
    <select name="mode"><option selected>Gray</option><option>Color</option><option>Lineart</option></select></label>
   <label>Page size
    <select name="size"><option value="a4" selected>A4</option><option value="letter">Letter</option><option value="full">Full glass (may fail)</option></select></label>
   <label>Format
-   <select name="format"><option selected>jpeg</option><option>png</option></select></label>
+   <select name="format"><option value="pdf" selected>PDF</option><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="tiff">TIFF</option></select></label>
   <button id="b">Scan</button>
  </fieldset>
 </form>
@@ -35,7 +35,9 @@ stays blank until the scanner finishes.</p>
    e.preventDefault(); b.disabled=true; b.textContent='Scanning...';
    const q=new URLSearchParams(new FormData(f)).toString();
    fetch('/cgi-bin/scan?'+q+'&t='+Date.now()).then(async r=>{
-     if(r.ok){const u=URL.createObjectURL(await r.blob());const img=new Image();img.onload=()=>URL.revokeObjectURL(u);img.src=u;out.replaceChildren(img);}
+     if(r.ok){const b=await r.blob();const u=URL.createObjectURL(b);
+       if(b.type==='application/pdf'){const a=document.createElement('a');a.href=u;a.download='scan.pdf';a.textContent='Download scan.pdf ('+Math.round(b.size/1024)+' kB)';out.replaceChildren(a);}
+       else{const img=new Image();img.onload=()=>URL.revokeObjectURL(u);img.src=u;out.replaceChildren(img);}}
      else{const pre=document.createElement('pre');pre.textContent=await r.text();out.replaceChildren(pre);}
    }).catch(e=>{out.textContent='Request failed: '+e;})
     .finally(()=>{b.disabled=false;b.textContent='Scan';});

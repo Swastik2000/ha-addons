@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         avahi-daemon libnss-mdns dbus \
         libsane-hpaio sane-utils \
         busybox \
+        libtiff-tools \
         curl ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \

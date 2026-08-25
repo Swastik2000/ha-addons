@@ -17,9 +17,11 @@ if [ "$op" = "info" ]; then
     exit 0
 fi
 
-dpi=$(val dpi);    case "$dpi"  in 75|100|150|200|300|600) ;; *) dpi=300 ;; esac
+dpi=$(val dpi);    case "$dpi"  in 75|100|150|200|300|600|1200) ;; *) dpi=300 ;; esac
 mode=$(val mode);  case "$mode" in Gray|Color|Lineart) ;; *) mode=Gray ;; esac
-fmt=$(val format); case "$fmt"  in jpeg|png) ;; *) fmt=jpeg ;; esac
+fmt=$(val format); case "$fmt"  in jpeg|png|tiff|pdf) ;; *) fmt=jpeg ;; esac
+# PDF is not a scanimage output format: scan to TIFF, then tiff2pdf.
+if [ "$fmt" = "pdf" ]; then sfmt=tiff; else sfmt="$fmt"; fi
 # hpaio advertises a 381 mm scan height for this hardware but the glass is
 # only A4. scanimage then asks for more scanlines than the scanner can
 # deliver and SANE aborts with "Application transferred too few scanlines".
@@ -37,12 +39,12 @@ src=$(val source); case "$src" in Flatbed|ADF) ;; *) src="" ;; esac
 extra="$geom"
 [ -n "$src" ] && extra="$extra --source $src"
 
-case "$dpi" in 600) SCAN_TIMEOUT=300 ;; 300) SCAN_TIMEOUT=180 ;; *) SCAN_TIMEOUT=120 ;; esac
+case "$dpi" in 1200) SCAN_TIMEOUT=600 ;; 600) SCAN_TIMEOUT=300 ;; 300) SCAN_TIMEOUT=180 ;; *) SCAN_TIMEOUT=120 ;; esac
 
 tmp=$(mktemp /tmp/scan.XXXXXX)
 err="$tmp.err"
 # fires on normal exit and on SIGTERM when the browser disconnects mid-scan
-trap 'rm -f "$tmp" "$err"' EXIT HUP INT TERM
+trap 'rm -f "$tmp" "$err" "$tmp.pdf"' EXIT HUP INT TERM
 # The scanner rejects a second client while busy, and the first attempt after
 # a long idle can come back short. One retry costs nothing.
 n=0
@@ -50,10 +52,18 @@ while [ $n -lt 2 ]; do
     # SIGTERM at $SCAN_TIMEOUT, SIGKILL 10s later: a wedged scanimage must
     # never keep hold of the scanner after the request is over.
     if timeout -k 10 "$SCAN_TIMEOUT" \
-         scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" $extra \
+         scanimage --format="$sfmt" --resolution "$dpi" --mode "$mode" $extra \
          > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
-        echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
-        cat "$tmp"; exit 0
+        if [ "$fmt" = "pdf" ]; then
+            if tiff2pdf -o "$tmp.pdf" "$tmp" 2>>"$err" && [ -s "$tmp.pdf" ]; then
+                echo "Content-Type: application/pdf"; echo "Cache-Control: no-store"; echo
+                cat "$tmp.pdf"; rm -f "$tmp.pdf"; exit 0
+            fi
+            rm -f "$tmp.pdf"
+        else
+            echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
+            cat "$tmp"; exit 0
+        fi
     fi
     n=$((n+1)); sleep 3
 done

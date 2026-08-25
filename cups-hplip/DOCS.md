@@ -112,8 +112,13 @@ Everywhere option.
 Set **`enable_scanning: true`** in the add-on Configuration tab, restart, then
 open `http://<ha-host>:8090`.
 
-Pick resolution, mode and format, press **Scan**, and the image appears in the
-page — save it like any other image. Works from a phone browser too.
+Pick resolution, mode and format, press **Scan**. Images appear inline; PDFs
+are offered as a download. Works from a phone browser too.
+
+Resolutions follow the sensor: 75 / 150 / 300 / 600 / **1200 dpi** (HP lists
+1200 dpi optical for the M1136). 1200 dpi takes minutes and produces very large
+files. Formats are JPEG, PNG, TIFF and **PDF** — PDF is produced by scanning to
+TIFF and converting with `tiff2pdf`, since `scanimage` cannot emit PDF itself.
 
 The scanner uses HPLIP's `hpaio` backend plus the `bb_marvell` plug-in, which
 the add-on already downloads. Check the add-on log for:

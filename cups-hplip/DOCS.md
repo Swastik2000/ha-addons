@@ -240,3 +240,31 @@ docker interfaces, set `mdns_interface`.
 Normal. These printers drop off the USB bus when idle and re-enumerate in ~10 s.
 The queue's error policy is `retry-job`, so jobs wait and print on wake. CUPS
 retries every 30 s, 5 times.
+
+## Security model — read this
+
+This add-on is built for a **trusted home LAN**. Two deliberate choices:
+
+* **CUPS admin is unauthenticated** (`DefaultAuthType None`, `/admin` and
+  `/admin/conf` allowed from RFC1918 ranges). Anyone on your network can add,
+  modify or delete printers and change server settings. This matches the other
+  CUPS add-ons and is what makes setup painless — but do not expose port 631
+  beyond your LAN, and do not run this on a network you share with guests you
+  do not trust.
+* **The scan UI is unauthenticated.** Anyone on the LAN can open :8090 and
+  trigger a scan of whatever is on the glass.
+
+Access is restricted to `localhost`, `10/8`, `172.16/12` and `192.168/16`;
+listening is IPv4-only. Neither port should ever be port-forwarded.
+
+`?op=info` on the scan UI reveals paths, package versions and the printer's
+serial number. The serial is already broadcast over mDNS, so this is not new
+exposure, but it is worth knowing.
+
+## Backups
+
+Printer configuration, PPDs and the cached HP plug-in live in `/share/cups`,
+not in the add-on's own `/data`. A **full** Home Assistant backup includes the
+`share` folder and therefore covers them; an add-on-only backup does **not**.
+If you rely on partial backups, back up `/share/cups` separately or expect to
+re-add the printer after a restore (the plug-in re-downloads by itself).

@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libsane-hpaio sane-utils \
         busybox \
         curl ca-certificates \
-    && apt-get purge -y --auto-remove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
               /usr/share/doc/* /usr/share/man/* /usr/share/locale/* \
@@ -48,7 +47,10 @@ COPY rootfs /
 RUN find /etc/cont-init.d /etc/services.d -type f -exec chmod +x {} \;
 
 EXPOSE 631
-HEALTHCHECK CMD lpstat -r || exit 1
+# lpstat -r exits 0 even when the scheduler is dead ('scheduler is not
+# running'), so testing its exit status is useless - grep the text instead.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=90s \
+  CMD lpstat -r 2>/dev/null | grep -q 'is running' || exit 1
 
 LABEL \
     io.hass.name="CUPS + HPLIP Print Server" \

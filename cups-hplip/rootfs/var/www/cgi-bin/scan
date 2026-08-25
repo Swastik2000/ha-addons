@@ -30,23 +30,28 @@ case "$size" in
     full)   geom="" ;;
     *)      geom="-x 215.9 -y 297" ;;   # A4, the default
 esac
-src=$(val source)
+# Whitelisted: this value is word-split into scanimage's argv, so an
+# unvalidated one lets any LAN client inject arbitrary scanimage options
+# (--output-file would write anywhere the add-on can reach).
+src=$(val source); case "$src" in Flatbed|ADF) ;; *) src="" ;; esac
 extra="$geom"
 [ -n "$src" ] && extra="$extra --source $src"
 
 tmp=$(mktemp /tmp/scan.XXXXXX)
+err="$tmp.err"
+# fires on normal exit and on SIGTERM when the browser disconnects mid-scan
+trap 'rm -f "$tmp" "$err"' EXIT HUP INT TERM
 # The scanner rejects a second client while busy, and the first attempt after
 # a long idle can come back short. One retry costs nothing.
 n=0
 while [ $n -lt 2 ]; do
     if scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" $extra \
-         > "$tmp" 2>/tmp/scan.err && [ -s "$tmp" ]; then
+         > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
         echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
-        cat "$tmp"; rm -f "$tmp"; exit 0
+        cat "$tmp"; exit 0
     fi
     n=$((n+1)); sleep 3
 done
 echo "Status: 500"; echo "Content-Type: text/plain"; echo
 echo "scan failed (dpi=$dpi mode=$mode fmt=$fmt src=${src:-default}):"
-cat /tmp/scan.err 2>/dev/null
-rm -f "$tmp"
+cat "$err" 2>/dev/null

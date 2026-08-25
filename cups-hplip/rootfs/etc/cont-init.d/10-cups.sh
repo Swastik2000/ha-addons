@@ -3,8 +3,10 @@ set -e
 
 CFG=/share/cups/config
 mkdir -p "$CFG"/ppd "$CFG"/ssl /share/cups/cache /share/cups/logs /share/cups/state
-chown -R root:lp /share/cups
-chmod -R 755 /share/cups
+# guarded: with set -e a chown failure would abort before cupsd.conf is
+# written, leaving cupsd on a stale config with no clue why
+chown -R root:lp /share/cups 2>/dev/null || true
+chmod -R 755 /share/cups 2>/dev/null || true
 
 # --- cupsd.conf ---------------------------------------------------
 cat > "$CFG"/cupsd.conf <<'EOL'

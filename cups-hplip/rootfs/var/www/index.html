@@ -35,7 +35,7 @@ stays blank until the scanner finishes.</p>
    e.preventDefault(); b.disabled=true; b.textContent='Scanning...';
    const q=new URLSearchParams(new FormData(f)).toString();
    fetch('/cgi-bin/scan?'+q+'&t='+Date.now()).then(async r=>{
-     if(r.ok){const img=new Image();img.src=URL.createObjectURL(await r.blob());out.replaceChildren(img);}
+     if(r.ok){const u=URL.createObjectURL(await r.blob());const img=new Image();img.onload=()=>URL.revokeObjectURL(u);img.src=u;out.replaceChildren(img);}
      else{const pre=document.createElement('pre');pre.textContent=await r.text();out.replaceChildren(pre);}
    }).catch(e=>{out.textContent='Request failed: '+e;})
     .finally(()=>{b.disabled=false;b.textContent='Scan';});

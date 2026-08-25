@@ -3,6 +3,12 @@
 # hassio_multicast (mdns-repeater). Both that and Avahi set SO_REUSEADDR on
 # 5353, so a second responder binds fine; you only get a "detected another
 # IPv4 mDNS stack" warning.
+if [ "$(jq -r '.enable_airprint // true' /data/options.json 2>/dev/null)" != "true" ]; then
+    bashio::log.info "AirPrint (mDNS) disabled - removing the avahi service entirely"
+    rm -rf /etc/services.d/avahi
+    exit 0
+fi
+
 IFACE=$(jq -r '.mdns_interface // ""' /data/options.json 2>/dev/null)
 
 

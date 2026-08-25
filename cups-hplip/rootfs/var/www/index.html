@@ -16,7 +16,7 @@
 <form id="f" action="/cgi-bin/scan" method="get" target="out">
  <fieldset>
   <label>Resolution
-   <select name="dpi"><option>75</option><option>150</option><option selected>300</option><option>600</option><option>1200</option></select></label>
+   <select name="dpi"><option>75</option><option selected>150</option><option>300</option><option>600</option><option>1200</option></select></label>
   <label>Mode
    <select name="mode"><option selected>Gray</option><option>Color</option><option>Lineart</option></select></label>
   <label>Page size
@@ -28,6 +28,10 @@
 </form>
 <p class="hint">A scan takes roughly 10-30 s depending on resolution. The page
 stays blank until the scanner finishes.</p>
+<p class="hint"><b>150 dpi is the reliable setting</b> - it is the only resolution
+measured to work in all three modes at full A4. 300 dpi fails on this hardware
+(1 of 13 test scans succeeded, in every mode and at every page height); if you
+pick it you will get an error rather than a scan.</p>
 <div id="out"></div>
 <script>
  const f=document.getElementById('f'),b=document.getElementById('b'),out=document.getElementById('out');

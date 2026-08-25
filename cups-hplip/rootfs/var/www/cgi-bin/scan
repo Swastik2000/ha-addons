@@ -63,22 +63,40 @@ timeout 30 scanimage -L >/dev/null 2>&1
 # Retry the SCAN only. Format conversion is a separate, local step: if it
 # fails the page is already captured, and re-scanning would spend another
 # pass over the glass to reproduce bytes we are still holding.
-n=1; scanned=0
+n=1; scanned=0; fatal=""
 while [ $n -le 3 ]; do
     if timeout -k 15 "$T" scanimage --format="$sfmt" --resolution "$dpi" \
          --mode "$mode" $extra > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
         scanned=1; break
     fi
+    # "Application transferred too few scanlines" is NOT transient: it depends
+    # only on dpi/mode. Measured on this hardware - 300 dpi failed 12 of 13
+    # attempts across every mode and every page height, and Colour failed 7 of
+    # 7 at both 100 and 200 dpi. Retrying only makes the user wait 85 s instead
+    # of 25 s for the same answer, so stop and say something actionable.
+    if grep -qi 'too few scanlines' "$err" 2>/dev/null; then fatal=scanlines; break; fi
     # backoff must exceed the ~11 s USB re-enumeration, not the old 3 s
     n=$((n+1)); [ $n -le 3 ] && sleep 14
 done
 
 if [ "$scanned" != 1 ]; then
     echo "Status: 500"; echo "Content-Type: text/plain"; echo
-    echo "scan failed after 3 attempts (dpi=$dpi mode=$mode fmt=$fmt size=${size:-a4}):"
-    if [ -s "$err" ]; then cat "$err"; else
-      echo "(no error output - scanimage was killed by the ${T}s timeout,"
-      echo " which usually means the scanner never woke or is held by another client)"
+    if [ "$fatal" = scanlines ]; then
+        echo "This scanner cannot complete a $dpi dpi $mode scan."
+        echo
+        echo "Measured on this hardware:"
+        echo "  300 dpi  - fails in every mode, at every page height (1 of 13 attempts)"
+        echo "  Colour   - fails at 100 and 200 dpi (0 of 7 each)"
+        echo "  150 dpi  - works in Lineart, Gray AND Colour at full A4"
+        echo
+        echo "Use 150 dpi (or 75 dpi). Not retried, because this failure is"
+        echo "deterministic - three more attempts would take 85 s to say the same."
+    else
+        echo "scan failed after 3 attempts (dpi=$dpi mode=$mode fmt=$fmt size=${size:-a4}):"
+        if [ -s "$err" ]; then cat "$err"; else
+          echo "(no error output - scanimage was killed by the ${T}s timeout,"
+          echo " which usually means the scanner never woke or is held by another client)"
+        fi
     fi
     exit 0
 fi

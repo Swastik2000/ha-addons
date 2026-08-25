@@ -107,6 +107,31 @@ It is discovered automatically by any CUPS desktop. Otherwise add
 `ipp://<ha-host>:631/printers/<QUEUE_NAME>` with the *driverless* / IPP
 Everywhere option.
 
+## Scan resolution: what actually works
+
+Measured on an HP LaserJet Pro M1136 MFP over ~45 test scans, not inferred
+from the spec sheet. The scanner advertises 75/100/150/200/300/600/1200 dpi,
+but does not deliver all of them.
+
+| Setting | Result |
+|---------|--------|
+| **150 dpi - Lineart, Gray and Colour** | **Reliable (7/7). This is the default.** |
+| 75 dpi - all three modes | Works |
+| 100 / 200 dpi - Lineart and Gray | Works |
+| 300 dpi - any mode | **Fails** (1 success in 13 attempts) |
+| Colour at 100 or 200 dpi | **Fails** (0 in 7 each) |
+| 600 / 1200 dpi | Not yet verified |
+
+Failures report `Application transferred too few scanlines` and are
+deterministic, so the add-on does not retry them - it returns immediately with
+an explanation instead of spending 85 seconds to reach the same answer.
+
+Page height is NOT the cause: 300 dpi was tested at 297, 290, 285, 280 and
+270 mm and fails at all of them. For Colour, the resolutions that work are the
+multiples of 75.
+
+If a scan fails, use 150 dpi.
+
 ## Scanning (MFP models)
 
 Set **`enable_scanning: true`** in the add-on Configuration tab, restart, then

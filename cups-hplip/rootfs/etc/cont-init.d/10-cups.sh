@@ -53,6 +53,15 @@ MaxJobs 100
   Allow 192.168.0.0/16
 </Location>
 <Policy default>
+  # CUPS hides job owner and document name from anyone who is not the job's
+  # owner or an admin, showing "Withheld"/"Unknown". With DefaultAuthType None
+  # every request is anonymous, so that is everyone. On a trusted home LAN it
+  # is far more useful to see who sent what. Also silences the four
+  # "No JobPrivateAccess defined" warnings from cupsd -t.
+  JobPrivateAccess all
+  JobPrivateValues none
+  SubscriptionPrivateAccess all
+  SubscriptionPrivateValues none
   <Limit All>
     Order deny,allow
   </Limit>

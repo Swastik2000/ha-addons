@@ -132,3 +132,20 @@ iOS issues `Cancel-Job` as cleanup once a job completes. With
 so CUPS answers `client-error-not-found`; iOS treats that as a failed job and
 resends the document, forever. Never set `PreserveJobHistory No` on a queue
 that serves AirPrint clients - use a timeout (`300`) instead.
+
+### Jobs show "Withheld" / "Unknown"
+
+CUPS hides `job-originating-user-name` and `job-name` from anyone who is not
+the job owner or an admin. With `DefaultAuthType None` every request is
+anonymous, so the web UI shows `Withheld` / `Unknown` for everything. Since
+v1.1.1 the default policy sets `JobPrivateAccess all` / `JobPrivateValues none`
+so you can see which device sent which document.
+
+### "Pages" column counts more than was printed
+
+A 1-page PDF at 3 copies prints 3 sheets but logs `total 9`. The PPD sets
+`*cupsManualCopies: True`, so `pdftopdf` expands the document to 3 physical
+pages, but the `copies=3` attribute still travels with them - each of the 3
+pages reports 3 copies in its `PAGE:` line, giving 3x3. Printed output is
+correct; only `page_log` accounting is inflated. This is cups-filters
+behaviour, not something this add-on sets.

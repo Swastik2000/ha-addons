@@ -3,7 +3,8 @@ set -e
 
 CFG=/share/cups/config
 mkdir -p "$CFG"/ppd "$CFG"/ssl /share/cups/cache /share/cups/logs /share/cups/state
-chown -R root:lp /share/cups && chmod -R 775 /share/cups
+chown -R root:lp /share/cups
+chmod -R 755 /share/cups
 
 # --- cupsd.conf ---------------------------------------------------
 cat > "$CFG"/cupsd.conf <<'EOL'
@@ -76,3 +77,10 @@ else
     echo "[hplip] WARNING: lj.so missing - host-based LaserJets (M1132/M1136/P1102) will NOT print"
 fi
 ls /dev/usb/lp* /dev/bus/usb/*/* >/dev/null 2>&1 && echo "[usb] USB device nodes present" || echo "[usb] no USB device nodes visible"
+
+# CUPS security check: cupsd exits silently (before opening any log) if
+# these are group/world writable. The old arest add-on left them 0775 on
+# /share, which killed cupsd on every start.
+chmod 640 "$CFG"/cupsd.conf "$CFG"/cups-files.conf 2>/dev/null || true
+chown root:lp "$CFG"/cupsd.conf "$CFG"/cups-files.conf 2>/dev/null || true
+echo "[cups] config perms: $(stat -c '%a %n' "$CFG"/cupsd.conf "$CFG"/cups-files.conf 2>/dev/null | tr '\n' ' ')"

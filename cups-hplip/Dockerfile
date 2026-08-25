@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         printer-driver-hpcups \
         avahi-daemon libnss-mdns dbus \
         curl ca-certificates \
+    && apt-get purge -y --auto-remove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
               /usr/share/doc/* /usr/share/man/* /usr/share/locale/* \

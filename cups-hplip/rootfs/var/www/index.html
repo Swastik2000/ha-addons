@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scan</title>
+<style>
+ :root{color-scheme:light dark}
+ body{font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem}
+ fieldset{border:1px solid #8888;border-radius:.5rem;margin:0 0 1rem}
+ label{display:block;margin:.6rem 0}
+ select,button{font:inherit;padding:.45rem;border-radius:.4rem;width:100%}
+ button{background:#2f6fed;color:#fff;border:0;padding:.7rem;margin-top:.5rem}
+ button:disabled{opacity:.5}
+ #out img{max-width:100%;margin-top:1rem;border:1px solid #8888;border-radius:.4rem}
+ .hint{color:#888;font-size:.85em}
+</style>
+<h1>Scan</h1>
+<form id="f" action="/cgi-bin/scan" method="get" target="out">
+ <fieldset>
+  <label>Resolution
+   <select name="dpi"><option>150</option><option selected>300</option><option>600</option></select></label>
+  <label>Mode
+   <select name="mode"><option selected>Gray</option><option>Color</option><option>Lineart</option></select></label>
+  <label>Format
+   <select name="format"><option selected>jpeg</option><option>png</option></select></label>
+  <button id="b">Scan</button>
+ </fieldset>
+</form>
+<p class="hint">A scan takes roughly 10-30 s depending on resolution. The page
+stays blank until the scanner finishes.</p>
+<div id="out"></div>
+<script>
+ const f=document.getElementById('f'),b=document.getElementById('b'),out=document.getElementById('out');
+ f.addEventListener('submit',e=>{
+   e.preventDefault(); b.disabled=true; b.textContent='Scanning...';
+   const q=new URLSearchParams(new FormData(f)).toString();
+   const img=new Image();
+   img.onload=()=>{out.replaceChildren(img);b.disabled=false;b.textContent='Scan';};
+   img.onerror=()=>{out.textContent='Scan failed - check the add-on log.';b.disabled=false;b.textContent='Scan';};
+   img.src='/cgi-bin/scan?'+q+'&t='+Date.now();
+ });
+</script>

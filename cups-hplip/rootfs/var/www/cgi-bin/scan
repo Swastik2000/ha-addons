@@ -1,0 +1,23 @@
+#!/bin/sh
+# Minimal scan CGI. Parses QUERY_STRING, shells out to scanimage, streams the
+# image straight to the browser. No framework, no temp files kept.
+q="$QUERY_STRING"
+val() { echo "$q" | tr '&' '\n' | grep "^$1=" | head -1 | cut -d= -f2; }
+
+dpi=$(val dpi);   case "$dpi"    in 150|300|600) ;; *) dpi=300 ;; esac
+mode=$(val mode); case "$mode"   in Gray|Color|Lineart) ;; *) mode=Gray ;; esac
+fmt=$(val format); case "$fmt"   in jpeg|png) ;; *) fmt=jpeg ;; esac
+
+tmp=$(mktemp /tmp/scan.XXXXXX)
+if scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" > "$tmp" 2>/tmp/scan.err && [ -s "$tmp" ]; then
+    echo "Content-Type: image/$fmt"
+    echo "Cache-Control: no-store"
+    echo
+    cat "$tmp"
+else
+    echo "Status: 500"
+    echo "Content-Type: text/plain"
+    echo
+    echo "scan failed:"; cat /tmp/scan.err 2>/dev/null
+fi
+rm -f "$tmp"

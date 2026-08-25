@@ -3,7 +3,8 @@
 # proprietary bb_marvell plug-in (models.dat: scan-type=8, SCAN_TYPE_MARVEL2),
 # which 05-hplip-plugin.sh already downloads and installs.
 if [ "$(jq -r '.enable_scanning // false' /data/options.json 2>/dev/null)" != "true" ]; then
-    bashio::log.info "scanning: disabled (set enable_scanning to turn it on)"
+    bashio::log.info "scanning: disabled - removing the scan UI service entirely"
+    rm -rf /etc/services.d/scanui
     exit 0
 fi
 
@@ -18,3 +19,5 @@ fi
 
 bashio::log.info "scanning: probing for the scanner..."
 scanimage -L 2>&1 | sed 's/^/[scan] /' || true
+
+bashio::log.info "scanning: UI will be available on http://<ha-ip>:8090"

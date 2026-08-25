@@ -149,3 +149,28 @@ pages, but the `copies=3` attribute still travels with them - each of the 3
 pages reports 3 copies in its `PAGE:` line, giving 3x3. Printed output is
 correct; only `page_log` accounting is inflated. This is cups-filters
 behaviour, not something this add-on sets.
+
+## Scanning (v1.2.0)
+
+The M1136's scanner works through HPLIP's `hpaio` SANE backend plus the
+proprietary `bb_marvell` plug-in (models.dat `scan-type=8`), which the add-on
+already downloads for printing. Verified detection:
+
+    device `hpaio:/usb/HP_LaserJet_Professional_M1136_MFP?serial=...'
+    is a Hewlett-Packard HP_LaserJet_Professional_M1136_MFP all-in-one
+
+Set `enable_scanning: true`, then open **http://<ha-ip>:8090**.
+
+Deliberately not scanservjs or any Node/Python stack. The UI is one static
+HTML page plus a POSIX-shell CGI served by **busybox httpd**. Measured cost:
+
+| | anonymous RAM |
+|---|---|
+| CUPS only | 3,216 kB |
+| + scan UI running | 3,340 kB |
+| **delta** | **124 kB** |
+
+For comparison a Node-based UI costs 50-80 MB resident. With
+`enable_scanning: false` the cont-init script deletes
+`/etc/services.d/scanui` before s6 starts services, so no process exists at
+all - not even a parked `sleep`. Zero cost when off.

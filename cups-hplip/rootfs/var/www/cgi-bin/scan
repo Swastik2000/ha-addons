@@ -14,7 +14,15 @@ if [ "$op" = "info" ]; then
     echo "Content-Type: text/plain"; echo
     echo "### scanimage -L"; timeout 25 scanimage -L 2>&1 || echo "(timed out)"
     echo; echo "### scanimage -A"; timeout 30 scanimage -A 2>&1 || echo "(timed out - device busy or asleep)"
-    echo; echo "### lock"; ls -l /tmp/scan.lock 2>/dev/null || echo "  (none - idle)"
+    echo; echo "### lock"
+    if [ -d /tmp/scan.lock ]; then
+        # Age separates "a scan is genuinely running" from "a killed scan left
+        # this behind"; without it an idle-looking device and a wedged one
+        # produce identical output.
+        echo "  HELD for $(( $(date +%s) - $(stat -c %Y /tmp/scan.lock) ))s (stale is >900s)"
+    else
+        echo "  (none - idle)"
+    fi
     echo; echo "### plugins"; ls -l /usr/share/hplip/scan/plugins/ 2>&1
     echo; echo "### hplip.state"; cat /var/lib/hp/hplip.state 2>&1
     exit 0
@@ -52,26 +60,40 @@ tmp=$(mktemp /tmp/scan.XXXXXX); err="$tmp.err"
 # A cheap enumerate costs ~1 s awake and gives the device time to come back.
 timeout 30 scanimage -L >/dev/null 2>&1
 
-n=1
+# Retry the SCAN only. Format conversion is a separate, local step: if it
+# fails the page is already captured, and re-scanning would spend another
+# pass over the glass to reproduce bytes we are still holding.
+n=1; scanned=0
 while [ $n -le 3 ]; do
     if timeout -k 15 "$T" scanimage --format="$sfmt" --resolution "$dpi" \
          --mode "$mode" $extra > "$tmp" 2>"$err" && [ -s "$tmp" ]; then
-        if [ "$fmt" = "pdf" ]; then
-            if tiff2pdf -o "$tmp.pdf" "$tmp" 2>>"$err" && [ -s "$tmp.pdf" ]; then
-                echo "Content-Type: application/pdf"; echo "Cache-Control: no-store"; echo
-                cat "$tmp.pdf"; exit 0
-            fi
-        else
-            echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
-            cat "$tmp"; exit 0
-        fi
+        scanned=1; break
     fi
     # backoff must exceed the ~11 s USB re-enumeration, not the old 3 s
     n=$((n+1)); [ $n -le 3 ] && sleep 14
 done
-echo "Status: 500"; echo "Content-Type: text/plain"; echo
-echo "scan failed after 3 attempts (dpi=$dpi mode=$mode fmt=$fmt size=${size:-a4}):"
-if [ -s "$err" ]; then cat "$err"; else
-  echo "(no error output - scanimage was killed by the ${T}s timeout,"
-  echo " which usually means the scanner never woke or is held by another client)"
+
+if [ "$scanned" != 1 ]; then
+    echo "Status: 500"; echo "Content-Type: text/plain"; echo
+    echo "scan failed after 3 attempts (dpi=$dpi mode=$mode fmt=$fmt size=${size:-a4}):"
+    if [ -s "$err" ]; then cat "$err"; else
+      echo "(no error output - scanimage was killed by the ${T}s timeout,"
+      echo " which usually means the scanner never woke or is held by another client)"
+    fi
+    exit 0
 fi
+
+if [ "$fmt" = "pdf" ]; then
+    if tiff2pdf -o "$tmp.pdf" "$tmp" 2>>"$err" && [ -s "$tmp.pdf" ]; then
+        echo "Content-Type: application/pdf"; echo "Cache-Control: no-store"; echo
+        cat "$tmp.pdf"; exit 0
+    fi
+    echo "Status: 500"; echo "Content-Type: text/plain"; echo
+    echo "The page scanned correctly, but converting it to PDF failed."
+    echo "Scan again with format=tiff to keep this page as an image."
+    [ -s "$err" ] && cat "$err"
+    exit 0
+fi
+
+echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
+cat "$tmp"; exit 0

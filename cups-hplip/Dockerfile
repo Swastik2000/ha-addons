@@ -45,7 +45,12 @@ RUN set -eux; \
     cat /etc/hp/hplip.conf
 
 COPY rootfs /
-RUN find /etc/cont-init.d /etc/services.d -type f -exec chmod +x {} \;
+# The scan UI lives in /share at runtime so it can be edited without a rebuild.
+# Keep the pristine shipped copy out of /var/www - that path becomes a symlink
+# into /share on first start, and an update must still be able to see what THIS
+# image ships in order to decide whether the /share copy is stale.
+RUN find /etc/cont-init.d /etc/services.d -type f -exec chmod +x {} \; \
+    && mv /var/www /opt/scanui-dist
 
 EXPOSE 631
 # lpstat -r exits 0 even when the scheduler is dead ('scheduler is not

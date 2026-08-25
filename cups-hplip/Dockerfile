@@ -21,6 +21,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
               /usr/share/doc/* /usr/share/man/* /usr/share/locale/* \
               /var/cache/debconf/*-old
 
+# ── Security updates on every add-on release ───────────────────────
+# Docker caches the apt layer above, so a CUPS security fix in Debian would
+# never reach an existing install - even after pressing Update - because the
+# layer is reused verbatim. Supervisor passes BUILD_VERSION on every build,
+# and referencing it here forces this (small) layer to re-run each release,
+# pulling only changed packages instead of reinstalling everything.
+ARG BUILD_VERSION=dev
+RUN echo "cache-bust ${BUILD_VERSION}" \
+    && apt-get update \
+    && apt-get -y --no-install-recommends upgrade \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # hpcups reads [hplip] version from /etc/hp/hplip.conf and refuses to dlopen
 # the binary plug-in if it disagrees with /var/lib/hp/hplip.state. Generate it
 # from the installed package version so the two can never drift, rather than

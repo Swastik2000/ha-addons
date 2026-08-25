@@ -20,9 +20,19 @@ fi
 dpi=$(val dpi);    case "$dpi"  in 75|100|150|200|300|600) ;; *) dpi=300 ;; esac
 mode=$(val mode);  case "$mode" in Gray|Color|Lineart) ;; *) mode=Gray ;; esac
 fmt=$(val format); case "$fmt"  in jpeg|png) ;; *) fmt=jpeg ;; esac
+# hpaio advertises a 381 mm scan height for this hardware but the glass is
+# only A4. scanimage then asks for more scanlines than the scanner can
+# deliver and SANE aborts with "Application transferred too few scanlines".
+# Constrain the scan area explicitly.
+size=$(val size)
+case "$size" in
+    letter) geom="-x 215.9 -y 279.4" ;;
+    full)   geom="" ;;
+    *)      geom="-x 215.9 -y 297" ;;   # A4, the default
+esac
 src=$(val source)
-extra=""
-[ -n "$src" ] && extra="--source $src"
+extra="$geom"
+[ -n "$src" ] && extra="$extra --source $src"
 
 tmp=$(mktemp /tmp/scan.XXXXXX)
 # The scanner rejects a second client while busy, and the first attempt after

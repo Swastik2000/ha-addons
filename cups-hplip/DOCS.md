@@ -124,6 +124,14 @@ With `enable_scanning: false` the scan service directory is deleted before s6
 starts services, so **no process exists at all** — zero RAM, not even a parked
 `sleep`.
 
+### "Application transferred too few scanlines"
+
+`hpaio` advertises a 381 mm scan height for this hardware, but the glass is
+only A4 (297 mm). `scanimage` then requests more scanlines than the scanner can
+physically deliver and SANE aborts. Fixed in v1.2.3 by constraining the scan
+area (`-x 215.9 -y 297` by default); the **Page size** selector exposes A4,
+Letter and unconstrained. Choosing "Full glass" reproduces the original error.
+
 ## Options
 
 | Option | Default | Meaning |

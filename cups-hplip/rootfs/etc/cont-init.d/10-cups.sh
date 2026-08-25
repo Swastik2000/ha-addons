@@ -7,7 +7,7 @@ chown -R root:lp /share/cups && chmod -R 775 /share/cups
 
 # --- cupsd.conf ---------------------------------------------------
 cat > "$CFG"/cupsd.conf <<'EOL'
-LogLevel warn
+LogLevel info
 MaxLogSize 10m
 Listen 0.0.0.0:631
 Listen /run/cups/cups.sock
@@ -75,4 +75,4 @@ if [ -e /usr/share/hplip/prnt/plugins/lj.so ]; then
 else
     echo "[hplip] WARNING: lj.so missing - host-based LaserJets (M1132/M1136/P1102) will NOT print"
 fi
-lsusb | grep -i hewlett || echo "[usb] no HP device seen on the USB bus yet"
+ls /dev/usb/lp* /dev/bus/usb/*/* >/dev/null 2>&1 && echo "[usb] USB device nodes present" || echo "[usb] no USB device nodes visible"

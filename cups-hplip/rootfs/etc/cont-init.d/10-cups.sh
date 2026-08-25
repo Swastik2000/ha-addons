@@ -52,6 +52,17 @@ PreserveJobHistory No
 </Policy>
 EOL
 
+# --- cups-files.conf: always write our own -------------------------
+# Never inherit this file from another CUPS add-on. Parsing is strict --
+# a single unknown directive (Alpine's "PeerCred on", for example) makes
+# cupsd exit before it can open a log, giving a completely silent death.
+cat > "$CFG"/cups-files.conf <<'EOL'
+SystemGroup lpadmin
+ErrorLog /share/cups/logs/error_log
+AccessLog /share/cups/logs/access_log
+PageLog /share/cups/logs/page_log
+EOL
+
 # --- persist /etc/cups on /share (directory-level symlink) --------
 # CUPS rewrites printers.conf atomically (write .N, rename .O, rename .N);
 # with per-file symlinks the first rename replaces the symlink with a real

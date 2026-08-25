@@ -1,13 +1,12 @@
 #!/usr/bin/with-contenv bash
-# Report to the add-on log: cupsd writes to its ErrorLog, so a startup
-# failure would otherwise be completely invisible.
 echo "[cupsd] binary: $(command -v cupsd || echo 'NOT FOUND')"
-echo "[cupsd] config: $(ls -l /etc/cups/cupsd.conf 2>&1)"
-echo "[cupsd] runtime dir: $(ls -ld /run/cups 2>&1)"
-mkdir -p /run/cups /var/log/cups
-echo "[cupsd] starting..."
+mkdir -p /run/cups /var/log/cups /share/cups/logs
+echo "[cupsd] --- config test ---"
+/usr/sbin/cupsd -t 2>&1 | sed 's/^/[cupsd-t] /'
+echo "[cupsd] --- starting ---"
 /usr/sbin/cupsd -f 2>&1
 rc=$?
 echo "[cupsd] EXITED with rc=$rc"
+[ -s /share/cups/logs/error_log ] && tail -5 /share/cups/logs/error_log | sed 's/^/[cupsd-log] /'
 sleep 5
 exit $rc

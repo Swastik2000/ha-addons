@@ -116,3 +116,18 @@ To stop a runaway immediately:
 
 Then clear the phone's own queue in **Print Center** (App Switcher) before
 re-enabling, or it will simply flood again.
+
+### Root cause of the iOS reprint loop (fixed in v1.0.4)
+
+`access_log` shows the signature clearly:
+
+    Create-Job     successful-ok
+    Send-Document  successful-ok
+    Cancel-Job     client-error-not-found   <- here
+    Create-Job     successful-ok            <- resubmits
+
+iOS issues `Cancel-Job` as cleanup once a job completes. With
+`PreserveJobHistory No` the job record is destroyed the moment it finishes,
+so CUPS answers `client-error-not-found`; iOS treats that as a failed job and
+resends the document, forever. Never set `PreserveJobHistory No` on a queue
+that serves AirPrint clients - use a timeout (`300`) instead.

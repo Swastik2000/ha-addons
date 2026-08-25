@@ -21,7 +21,12 @@ DefaultShared Yes
 ReadyPaperSizes A4,Letter
 WebInterface Yes
 DefaultAuthType None
-PreserveJobHistory No
+# MUST NOT be "No". AirPrint clients issue Cancel-Job as cleanup after a
+# job finishes; if the record is already gone CUPS answers
+# client-error-not-found, iOS reads that as a failed job and RESUBMITS the
+# whole document - an infinite print loop. Keep records briefly, then reap.
+PreserveJobHistory 300
+PreserveJobFiles No
 
 <Location />
   Order allow,deny

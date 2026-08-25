@@ -1,5 +1,5 @@
 name: CUPS + HPLIP Print Server
-version: "1.0.5"
+version: "1.1.0"
 slug: cups_hplip
 description: CUPS with HPLIP and the HP binary plug-in (host-based LaserJets such as the M1136) plus AirPrint
 url: https://github.com/Swastik2000/ha-addons
@@ -21,6 +21,8 @@ ports_description:
 options:
   enable_airprint: true
   mdns_interface: ""
+  enable_scanning: false
 schema:
   enable_airprint: bool
   mdns_interface: str?
+  enable_scanning: bool

@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ghostscript \
         printer-driver-hpcups \
         avahi-daemon libnss-mdns dbus \
+        libsane-hpaio sane-utils \
         curl ca-certificates \
     && apt-get purge -y --auto-remove \
     && apt-get clean \
@@ -19,10 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
               /usr/share/doc/* /usr/share/man/* /usr/share/locale/* \
               /var/cache/debconf/*-old
 
-# /etc/hp/hplip.conf is shipped only by libsane-hpaio (the 10 MB scanner
-# stack). hpcups reads [hplip] version from it and refuses to dlopen the
-# binary plug-in if it disagrees with /var/lib/hp/hplip.state - so generate
-# just that file from the installed package version.
+# hpcups reads [hplip] version from /etc/hp/hplip.conf and refuses to dlopen
+# the binary plug-in if it disagrees with /var/lib/hp/hplip.state. Generate it
+# from the installed package version so the two can never drift, rather than
+# relying on whichever hplip.conf a dependency happens to ship.
 RUN set -eux; \
     VER="$(dpkg-query -W -f='${Version}' printer-driver-hpcups | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+')"; \
     install -d /etc/hp /var/lib/hp /usr/share/hplip/prnt/plugins; \

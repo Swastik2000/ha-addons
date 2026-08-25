@@ -1,23 +1,42 @@
 #!/bin/sh
-# Minimal scan CGI. Parses QUERY_STRING, shells out to scanimage, streams the
-# image straight to the browser. No framework, no temp files kept.
+# Scan CGI. op=info dumps the backend's capabilities so failures can be
+# diagnosed without rebuilding the add-on.
 q="$QUERY_STRING"
-val() { echo "$q" | tr '&' '\n' | grep "^$1=" | head -1 | cut -d= -f2; }
+val() { echo "$q" | tr '&' '\n' | grep "^$1=" | head -1 | cut -d= -f2- | sed 's/%20/ /g'; }
 
-dpi=$(val dpi);   case "$dpi"    in 150|300|600) ;; *) dpi=300 ;; esac
-mode=$(val mode); case "$mode"   in Gray|Color|Lineart) ;; *) mode=Gray ;; esac
-fmt=$(val format); case "$fmt"   in jpeg|png) ;; *) fmt=jpeg ;; esac
+op=$(val op)
+
+if [ "$op" = "info" ]; then
+    echo "Content-Type: text/plain"; echo
+    echo "### scanimage -L"; scanimage -L 2>&1
+    echo; echo "### scanimage -A (device options)"; scanimage -A 2>&1
+    echo; echo "### plugins"; ls -l /usr/share/hplip/scan/plugins/ 2>&1
+    echo; echo "### hplip.state"; cat /var/lib/hp/hplip.state 2>&1
+    echo; echo "### hplip.conf [hplip]"; grep -A2 '^\[hplip\]' /etc/hp/hplip.conf 2>&1
+    echo; echo "### dll.conf"; grep -v '^#' /etc/sane.d/dll.conf 2>/dev/null | grep -v '^$'
+    exit 0
+fi
+
+dpi=$(val dpi);    case "$dpi"  in 75|100|150|200|300|600) ;; *) dpi=300 ;; esac
+mode=$(val mode);  case "$mode" in Gray|Color|Lineart) ;; *) mode=Gray ;; esac
+fmt=$(val format); case "$fmt"  in jpeg|png) ;; *) fmt=jpeg ;; esac
+src=$(val source)
+extra=""
+[ -n "$src" ] && extra="--source $src"
 
 tmp=$(mktemp /tmp/scan.XXXXXX)
-if scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" > "$tmp" 2>/tmp/scan.err && [ -s "$tmp" ]; then
-    echo "Content-Type: image/$fmt"
-    echo "Cache-Control: no-store"
-    echo
-    cat "$tmp"
-else
-    echo "Status: 500"
-    echo "Content-Type: text/plain"
-    echo
-    echo "scan failed:"; cat /tmp/scan.err 2>/dev/null
-fi
+# The scanner rejects a second client while busy, and the first attempt after
+# a long idle can come back short. One retry costs nothing.
+n=0
+while [ $n -lt 2 ]; do
+    if scanimage --format="$fmt" --resolution "$dpi" --mode "$mode" $extra \
+         > "$tmp" 2>/tmp/scan.err && [ -s "$tmp" ]; then
+        echo "Content-Type: image/$fmt"; echo "Cache-Control: no-store"; echo
+        cat "$tmp"; rm -f "$tmp"; exit 0
+    fi
+    n=$((n+1)); sleep 3
+done
+echo "Status: 500"; echo "Content-Type: text/plain"; echo
+echo "scan failed (dpi=$dpi mode=$mode fmt=$fmt src=${src:-default}):"
+cat /tmp/scan.err 2>/dev/null
 rm -f "$tmp"

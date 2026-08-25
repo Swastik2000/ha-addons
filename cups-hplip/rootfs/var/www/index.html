@@ -32,9 +32,10 @@ stays blank until the scanner finishes.</p>
  f.addEventListener('submit',e=>{
    e.preventDefault(); b.disabled=true; b.textContent='Scanning...';
    const q=new URLSearchParams(new FormData(f)).toString();
-   const img=new Image();
-   img.onload=()=>{out.replaceChildren(img);b.disabled=false;b.textContent='Scan';};
-   img.onerror=()=>{out.textContent='Scan failed - check the add-on log.';b.disabled=false;b.textContent='Scan';};
-   img.src='/cgi-bin/scan?'+q+'&t='+Date.now();
+   fetch('/cgi-bin/scan?'+q+'&t='+Date.now()).then(async r=>{
+     if(r.ok){const img=new Image();img.src=URL.createObjectURL(await r.blob());out.replaceChildren(img);}
+     else{const pre=document.createElement('pre');pre.textContent=await r.text();out.replaceChildren(pre);}
+   }).catch(e=>{out.textContent='Request failed: '+e;})
+    .finally(()=>{b.disabled=false;b.textContent='Scan';});
  });
 </script>

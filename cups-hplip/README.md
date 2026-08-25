@@ -102,9 +102,10 @@ Cause: avahi advertising the queue on every interface in the container,
 including the `hassio` bridge and each docker `veth`. AirPrint clients try
 those `172.30.x.x` addresses, fail, and resubmit the whole job.
 
-Since v1.0.3 the add-on binds avahi to the interface holding the default
-route automatically. Override with the `mdns_interface` option (`end0` for
-wired, `wlan0` for Wi-Fi) if auto-detection picks the wrong one. Verify with:
+Note: this was NOT the cause of the reprint loop above - see the root-cause
+section. Avahi advertises on all interfaces by default, matching upstream.
+If discovery is unreliable, set the `mdns_interface` option (`end0` for wired,
+`wlan0` for Wi-Fi) to bind a single interface. Verify with:
 
     ha addons logs <slug> | grep "avahi: interfaces"
     # want exactly one "Joining mDNS multicast group on interface ..."

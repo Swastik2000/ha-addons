@@ -21,12 +21,15 @@ DefaultShared Yes
 ReadyPaperSizes A4,Letter
 WebInterface Yes
 DefaultAuthType None
-# MUST NOT be "No". AirPrint clients issue Cancel-Job as cleanup after a
-# job finishes; if the record is already gone CUPS answers
-# client-error-not-found, iOS reads that as a failed job and RESUBMITS the
-# whole document - an infinite print loop. Keep records briefly, then reap.
-PreserveJobHistory 300
+# Upstream CUPS defaults this to INT_MAX (scheduler/cupsd.h: DEFAULT_HISTORY)
+# i.e. keep job records indefinitely. Do NOT set "No": AirPrint clients send
+# Cancel-Job as cleanup once a job completes, and if the record is gone CUPS
+# answers client-error-not-found (scheduler/ipp.c cancel_job), which iOS reads
+# as a failed job and resubmits the whole document - an infinite print loop.
+# Match upstream and bound memory with MaxJobs instead.
+PreserveJobHistory Yes
 PreserveJobFiles No
+MaxJobs 100
 
 <Location />
   Order allow,deny

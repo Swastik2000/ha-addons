@@ -5,15 +5,6 @@
 # IPv4 mDNS stack" warning.
 IFACE=$(jq -r '.mdns_interface // ""' /data/options.json 2>/dev/null)
 
-# Auto-detect when unset. Advertising on every docker veth and the hassio
-# bridge gives AirPrint clients unroutable 172.30.x.x addresses to try; iOS
-# reacts by RESUBMITTING the whole job, which prints the same document over
-# and over. Bind to the interface holding the default route instead.
-# /proc/net/route avoids a dependency on iproute2.
-if [ -z "$IFACE" ]; then
-    IFACE=$(awk '$2=="00000000" && $8=="00000000" {print $1; exit}' /proc/net/route 2>/dev/null)
-    [ -n "$IFACE" ] && bashio::log.info "avahi: auto-detected LAN interface ${IFACE}"
-fi
 
 {
   echo "[server]"

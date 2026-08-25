@@ -150,7 +150,7 @@ Measured on a Raspberry Pi 4 (aarch64):
 | Scan UI running | **+124 kB** |
 | During a scan | +8–15 MB, transient |
 | Scanning disabled | 0 — the service is never created |
-| Image on disk | ~330 MB |
+| Image on disk | ~493 MB (SANE + security layer included) |
 
 No Python, no Node, no scanner GUI stack: `cupsd` + `dbus` + `avahi`, plus
 `busybox httpd` when scanning is on.

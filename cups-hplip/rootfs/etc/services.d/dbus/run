@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv bash
+mkdir -p /run/dbus && rm -f /run/dbus/pid
+dbus-uuidgen --ensure
+exec dbus-daemon --system --nofork --nopidfile

@@ -1,0 +1,26 @@
+name: CUPS + HPLIP Print Server
+version: "1.0.0"
+slug: cups_hplip
+description: CUPS with HPLIP and the HP binary plug-in (host-based LaserJets such as the M1136) plus AirPrint
+url: https://github.com/arest/cups-addon
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: services
+host_network: true
+usb: true
+hassio_api: true
+map:
+  - share:rw
+  - addon_config:rw
+ports:
+  631/tcp: 631
+ports_description:
+  631/tcp: CUPS web interface / IPP
+options:
+  enable_airprint: true
+  mdns_interface: ""
+schema:
+  enable_airprint: bool
+  mdns_interface: str?

@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv bashio
+# Read /data/options.json directly: bashio::config goes through the
+# Supervisor API, which makes the add-on untestable outside Home Assistant.
+if [ "$(jq -r '.enable_airprint // true' /data/options.json 2>/dev/null)" != "true" ]; then
+    bashio::log.info "AirPrint (mDNS) disabled in add-on options"
+    exec sleep infinity
+fi
+for _ in $(seq 1 30); do [ -S /run/dbus/system_bus_socket ] && break; sleep 1; done
+bashio::log.info "Starting avahi-daemon for AirPrint discovery"
+exec avahi-daemon --no-chroot --no-rlimits -f /etc/avahi/avahi-daemon.conf
